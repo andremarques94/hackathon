@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+
+        <title>&lt;Code for All_&gt;</title>
+
+        <meta name="author" content="<Academia de Código_>" />
+
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+
+        <meta
+            name="viewport"
+            content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, minimal-ui"
+        />
+
+        <link rel="stylesheet" href="/css/reveal.css" />
+        <link rel="stylesheet" href="/css/theme/ac.css" id="theme" />
+
+        <!-- Use for presentation specific styling -->
+        <link rel="stylesheet" href="/css/presentation.css" />
+
+        <!-- Code syntax highlighting -->
+        <link rel="stylesheet" href="/lib/css/zenburn.css" />
+
+        <!-- Printing and PDF exports -->
+        <script>
+            var link = document.createElement('link');
+            link.rel = 'stylesheet';
+            link.type = 'text/css';
+            link.href = window.location.search.match(/print-pdf/gi)
+                ? '/css/print/pdf.css'
+                : '/css/print/paper.css';
+            document.getElementsByTagName('head')[0].appendChild(link);
+        </script>
+
+        <!--[if lt IE 9]>
+            <script src="lib/js/html5shiv.js"></script>
+        <![endif]-->
+    </head>
+
+    <body>
+        <div class="header">
+            <img id="logo" src="/logo.png" />
+        </div>
+
+        <div class="reveal">
+            <!-- Any section element inside of this container is displayed as a slide -->
+            <div class="slides">
+                <section>
+                    <section>
+                        <h1>Deployment setup</h1>
+                    </section>
+                </section>
+                <section>
+                    <section>
+                        <h1>Project setup</h1>
+                    </section>
+
+                    <section>
+                        <h2>Step 1</h2>
+                        <p>Add maven compiler plugin</p>
+                        <pre class="fragment">
+                            <code class="xml" data-trim contenteditable>
+&lt;plugin&gt;
+    &lt;groupId&gt;org.apache.maven.plugins&lt;/groupId&gt;
+    &lt;artifactId&gt;maven-compiler-plugin&lt;/artifactId&gt;
+    &lt;version&gt;3.8.0&lt;/version&gt;
+    &lt;configuration&gt;
+        &lt;source&gt;1.8&lt;/source&gt;
+        &lt;target&gt;1.8&lt;/target&gt;
+    &lt;/configuration&gt;
+&lt;/plugin&gt;
+                            </code>
+                        </pre>
+                        <small class="fragment">
+                            <u>target</u> has to be 1.8 since that's heroku's default java version
+                        </small>
+                    </section>
+
+                    <section>
+                        <h2>Step 2</h2>
+                        <p>Add maven dependency plugin</p>
+                        <pre class="fragment">
+                            <code class="xml" data-trim contenteditable>
+&lt;plugin&gt;
+    &lt;groupId&gt;org.apache.maven.plugins&lt;/groupId&gt;
+    &lt;artifactId&gt;maven-dependency-plugin&lt;/artifactId&gt;
+    &lt;version&gt;3.0.2&lt;/version&gt;
+    &lt;executions&gt;
+        &lt;execution&gt;
+            &lt;phase&gt;package&lt;/phase&gt;
+            &lt;goals&gt;&lt;goal&gt;copy&lt;/goal&gt;&lt;/goals&gt;
+            &lt;configuration&gt;
+                &lt;artifactItems&gt;
+                    &lt;artifactItem&gt;
+                        &lt;groupId&gt;com.github.jsimone&lt;/groupId&gt;
+                        &lt;artifactId&gt;webapp-runner&lt;/artifactId&gt;
+                        &lt;version&gt;8.5.31.0&lt;/version&gt;
+                        &lt;destFileName&gt;webapp-runner.jar&lt;/destFileName&gt;
+                    &lt;/artifactItem&gt;
+                &lt;/artifactItems&gt;
+            &lt;/configuration&gt;
+        &lt;/execution&gt;
+    &lt;/executions&gt;
+&lt;/plugin&gt;
+                            </code>
+                        </pre>
+                    </section>
+                    <section>
+                        <h2>Step 3</h2>
+                        <p>Add postgres dependency</p>
+                        <pre class="fragment">
+                            <code class="xml" data-trim contenteditable>
+&lt;dependency&gt;
+    &lt;groupId&gt;org.postgresql&lt;/groupId&gt;
+    &lt;artifactId&gt;postgresql&lt;/artifactId&gt;
+    &lt;version&gt;42.2.12&lt;/version&gt;
+&lt;/dependency&gt;
+                            </code>
+                        </pre>
+                    </section>
+                    <section>
+                        <h2>Step 4</h2>
+                        <p>
+                            Add a file named <u>Procfile</u>
+                            in the root of the project with the content:
+                        </p>
+                        <pre class="fragment">
+                            <code class="xml" data-trim contenteditable>
+                                web: java $JAVA_OPTS -jar target/dependency/webapp-runner.jar --port $PORT target/*.war
+                            </code>
+                        </pre>
+                        <small class="fragment">
+                            The filename doesn't have extension and starts with a capital P
+                        </small>
+                    </section>
+
+                    <section>
+                        <h2>Step 5</h2>
+                        <p>
+                            Create a new persistence unit for postgres
+                        </p>
+                        <pre class="fragment">
+                            <code class="xml" data-trim contenteditable>
+&lt;bean class="org.springframework.orm.jpa.support.PersistenceAnnotationBeanPostProcessor"/&gt;
+
+&lt;bean class="java.net.URI" id="dbUrl"&gt;
+    &lt;constructor-arg value="#{systemEnvironment['DATABASE_URL']}"/&gt;
+&lt;/bean&gt;
+
+&lt;bean id="dataSource" class="com.mchange.v2.c3p0.ComboPooledDataSource" destroy-method="close"&gt;
+    &lt;property name="driverClass" value="org.postgresql.Driver"/&gt;
+    &lt;property name="jdbcUrl" value="#{ 'jdbc:postgresql://' + @dbUrl.getHost() + ':' + @dbUrl.getPort() + @dbUrl.getPath() }"/&gt;
+    &lt;property name="user" value="#{ @dbUrl.getUserInfo().split(':')[0] }"/&gt;
+    &lt;property name="password" value="#{ @dbUrl.getUserInfo().split(':')[1] }"/&gt;
+&lt;/bean&gt;
+
+&lt;bean id="emFactory" class="org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean"&gt;
+    &lt;property name="dataSource" ref="dataSource"/&gt;
+    &lt;property name="packagesToScan" value="org.academiadecodigo.javabank.persistence.model"/&gt;
+    &lt;property name="jpaVendorAdapter"&gt;
+        &lt;bean class="org.springframework.orm.jpa.vendor.HibernateJpaVendorAdapter"/&gt;
+    &lt;/property&gt;
+    &lt;property name="jpaProperties"&gt;
+        &lt;map&gt;
+            &lt;entry key="hibernate.dialect" value="org.hibernate.dialect.PostgresPlusDialect"/&gt;
+            &lt;!-- Run as create once to initialize the schema --&gt;
+            &lt;entry key="hibernate.hbm2ddl.auto" value="create"/&gt;
+        &lt;/map&gt;
+    &lt;/property&gt;
+&lt;/bean&gt;
+                            </code>
+                        </pre>
+                        <small class="fragment"
+                            >If you are using profiles, make sure you select this persistence
+                            unit.</small
+                        >
+                        <small class="fragment"> Change the <u>packagesToScan</u> property</small>
+                        <small class="fragment">
+                            Run with <u>create</u> first to create the database schema. Change to
+                            validate later if you want to keep the records in the next deploy. Or
+                            update to change the database schema, but keep the records.
+                        </small>
+                    </section>
+                    <section>
+                        <h2>Step 6</h2>
+                        <p>Commit the changes and push to github</p>
+                    </section>
+                </section>
+                <section>
+                    <section>
+                        <h1>Heroku setup</h1>
+                    </section>
+                    <section>
+                        <h2>Step 1</h2>
+                        <p>Sign up to Heroku</p>
+                    </section>
+                    <section>
+                        <h2>Step 2</h2>
+                        <p>Login to your Heroku dashboard</p>
+                    </section>
+                    <section>
+                        <h2>Step 3</h2>
+                        <p>3.1 Click 'New -> Create new app'</p>
+                        <p>3.2 Choose a name (this will be used for the application url)</p>
+                        <p>3.3 Click 'Create app'</p>
+                    </section>
+                    <section>
+                        <h2>Step 4</h2>
+                        <p>Click Resouces</p>
+                        <p>Add <u>Heroku-Postgres</u> add-on with Hobby Dev-Free plan</p>
+                    </section>
+                    <section>
+                        <h2>Step 5</h2>
+                        <p>Click Deploy</p>
+                        <p>Choose deployment method github</p>
+                        <p>Insert the repository's name and connect</p>
+                        <p>Click <u>Deploy Branch</u></p>
+                        <p>Repeat last step to deploy again later</p>
+                        <p>Click 'Open app' to visit your application</p>
+                    </section>
+                </section>
+            </div>
+        </div>
+
+        <script src="/lib/js/head.min.js"></script>
+        <script src="/js/reveal.js"></script>
+
+        <script>
+            // Full list of configuration options available at:
+            // https://github.com/hakimel/reveal.js#configuration
+            Reveal.initialize({
+                controls: false,
+                keyboard: true,
+                center: true,
+                help: true,
+                progress: true,
+                slideNumber: true,
+                history: false,
+                center: true,
+                width: 1024,
+                overview: true,
+
+                transition: 'slide', // none/fade/slide/convex/concave/zoom,
+                limits: {
+                    path: 'limits/limits.json'
+                },
+                menu: {
+                    // Specifies which side of the presentation the menu will
+                    // be shown. Use 'left' or 'right'.
+                    side: 'left',
+
+                    // Add slide numbers to the titles in the slide list.
+                    // Use 'true' or format string (same as reveal.js slide numbers)
+                    numbers: true,
+
+                    // Hide slides from the menu that do not have a title.
+                    // Set to 'true' to only list slides with titles.
+                    hideMissingTitles: true,
+
+                    // Add markers to the slide titles to indicate the
+                    // progress through the presentation
+                    markers: false,
+
+                    // Specify custom panels to be included in the menu, by
+                    // providing an array of objects with 'title', 'icon'
+                    // properties, and either a 'src' or 'content' property.
+                    custom: false,
+
+                    // Specifies the themes that will be available in the themes
+                    // menu panel. Set to 'false' to hide themes panel.
+                    themes: false,
+
+                    // Specifies if the transitions menu panel will be shown.
+                    transitions: true,
+
+                    // Adds a menu button to the slides to open the menu panel.
+                    // Set to 'false' to hide the button.
+                    openButton: true,
+
+                    // If 'true' allows the slide number in the presentation to
+                    // open the menu panel. The reveal.js slideNumber option must
+                    // be displayed for this to take effect
+                    openSlideNumber: false,
+
+                    // If true allows the user to open and navigate the menu using
+                    // the keyboard. Standard keyboard interaction with reveal
+                    // will be disabled while the menu is open.
+                    keyboard: true
+                },
+
+                // Optional reveal.js plugins
+                dependencies: [
+                    {
+                        src: '/lib/js/classList.js',
+                        condition: function () {
+                            return !document.body.classList;
+                        }
+                    },
+                    {
+                        src: '/plugin/markdown/marked.js',
+                        condition: function () {
+                            return !!document.querySelector('[data-markdown]');
+                        }
+                    },
+                    {
+                        src: '/plugin/markdown/markdown.js',
+                        condition: function () {
+                            return !!document.querySelector('[data-markdown]');
+                        }
+                    },
+                    {
+                        src: '/plugin/highlight/highlight.js',
+                        async: true,
+                        condition: function () {
+                            return !!document.querySelector('pre code');
+                        },
+                        callback: function () {
+                            hljs.initHighlightingOnLoad();
+                        }
+                    },
+                    {
+                        src: '/plugin/zoom-js/zoom.js',
+                        async: true
+                    },
+                    {
+                        src: '/plugin/notes/notes.js',
+                        async: true
+                    },
+                    {
+                        src: '/plugin/hide-slides/index.js',
+                        async: true
+                    }
+                ]
+            });
+        </script>
+    </body>
+</html>
